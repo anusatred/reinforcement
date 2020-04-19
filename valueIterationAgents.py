@@ -34,7 +34,7 @@ import collections
 class ValueIterationAgent(ValueEstimationAgent):
     """
         * Please read learningAgents.py before reading this.*
-        
+
         A ValueIterationAgent takes a Markov decision process
         (see mdp.py) on initialization and runs value iteration
         for a given number of iterations using the supplied
@@ -45,6 +45,7 @@ class ValueIterationAgent(ValueEstimationAgent):
           Your value iteration agent should take an mdp on
           construction, run the indicated number of iterations
           and then act according to the resulting policy.
+
           Some useful mdp methods you will use:
               mdp.getStates()
               mdp.getPossibleActions(state)
@@ -61,27 +62,24 @@ class ValueIterationAgent(ValueEstimationAgent):
     def runValueIteration(self):
         # Write value iteration code here
         "*** YOUR CODE HERE ***"
-        
-        values = util.Counter()
-
-        for i in range(self.iterations):
-            values = self.values.copy()
-
-            for state in self.mdp.getStates():
-                possibleVals = []
-
-                if self.mdp.isTerminal(state):
-                    self.values[state] = 0
-   
-                else:
-                    for action in self.mdp.getPossibleActions(state):
-                        tempValue = 0
-                        
-                        for t in self.mdp.getTransitionStatesAndProbs(state, action):
-                            tempValue += t[1]*(self.mdp.getReward(state, action, t[0]) + self.discount * values[t[0]])
-                        possibleVals.append(tempValue)
-
-                    self.values[state] = max(possibleVals)
+        while self.iterations > 0:
+            tempValues = self.values.copy()
+            allStates = self.mdp.getStates()
+            for state in allStates:
+                allActionsForState = self.mdp.getPossibleActions(state)
+                chanceNodeValues = []
+                for action in allActionsForState:
+                    finalStates = self.mdp.getTransitionStatesAndProbs(state, action)
+                    weightedAvg = 0
+                    for finalState in finalStates:
+                        nextState = finalState[0]
+                        probability = finalState[1]
+                        Reward=self.mdp.getReward(state,action,nextState)
+                        weightedAvg += (probability * (Reward + (self.discount * tempValues[nextState])))
+                    chanceNodeValues.append(weightedAvg)
+                if len(chanceNodeValues) != 0:
+                    self.values[state] = max(chanceNodeValues)
+            self.iterations -= 1
 
 
     def getValue(self, state):
@@ -96,41 +94,42 @@ class ValueIterationAgent(ValueEstimationAgent):
           Compute the Q-value of action in state from the
           value function stored in self.values.
         """
+        "*** YOUR CODE HERE ***"
         finalStates = self.mdp.getTransitionStatesAndProbs(state, action)
-        weightedAverage = 0
+        weightedAvg = 0
         for finalState in finalStates:
             nextState = finalState[0]
             probability = finalState[1]
-            weightedAverage += (probability * (self.mdp.getReward(state, action, nextState) + (self.discount * self.values[nextState])))
+            Reward=self.mdp.getReward(state, action, nextState)
+            weightedAvg += (probability * (Reward + (self.discount * self.values[nextState])))
 
-        return weightedAverage
-        
+        return weightedAvg
 
     def computeActionFromValues(self, state):
         """
           The policy is the best action in the given state
           according to the values currently stored in self.values.
+
           You may break ties any way you see fit.  Note that if
           there are no legal actions, which is the case at the
           terminal state, you should return None.
         """
-        if self.mdp.isTerminal(state):
+        "*** YOUR CODE HERE ***"
+        Terminal=self.mdp.isTerminal(state)
+        if Terminal:
             return None
         allActionsForState = self.mdp.getPossibleActions(state)
         finalAction = ""
         maxSum = float("-inf")
         for action in allActionsForState:
-            weightedAverage = self.computeQValueFromValues(state, action)
-            if (maxSum == 0.0 and action == "") or weightedAverage >= maxSum:
+            weightedAvg = self.computeQValueFromValues(state, action)
+            if (maxSum == 0.0 and action == "") or weightedAvg >= maxSum:
                 finalAction = action
-                maxSum = weightedAverage
+                maxSum = weightedAvg
 
         return finalAction
 
-
-
     def getPolicy(self, state):
-        value = 0
         return self.computeActionFromValues(state)
 
     def getAction(self, state):
@@ -139,9 +138,11 @@ class ValueIterationAgent(ValueEstimationAgent):
 
     def getQValue(self, state, action):
         return self.computeQValueFromValues(state, action)
+
 class AsynchronousValueIterationAgent(ValueIterationAgent):
     """
         * Please read learningAgents.py before reading this.*
+
         An AsynchronousValueIterationAgent takes a Markov decision process
         (see mdp.py) on initialization and runs cyclic value iteration
         for a given number of iterations using the supplied
@@ -155,6 +156,7 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
           updates the value of only one state, which cycles through
           the states list. If the chosen state is terminal, nothing
           happens in that iteration.
+
           Some useful mdp methods you will use:
               mdp.getStates()
               mdp.getPossibleActions(state)
@@ -166,38 +168,33 @@ class AsynchronousValueIterationAgent(ValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        values = util.Counter()
+        states = self.mdp.getStates()
 
-        '''
-        for i in xrange(self.iterations):
-          for state in self.mdp.getStates():
-            Q_s = util.Counter() # the Q values for given the specified state
-            
-            for action in self.mdp.getPossibleActions(state):
-              Q_s[action] = self.computeQValueFromValues(state, action)
-            
-            self.values[state] = Q_s[Q_s.argMax()]
-          #self.values = valuesK1
-        '''
-        iterCounter = 0
+        for i in range(self.iterations):
+            currentState = states[i%len(states)]
+            values = self.values.copy()
+            possibleVals = []
+            Terminal=self.mdp.isTerminal(currentState)
 
-        while iterCounter < self.iterations:
-          for state in self.mdp.getStates():
-            Q_s = util.Counter() # the Q values for given the specified state
-            
-            for action in self.mdp.getPossibleActions(state):
-              Q_s[action] = self.computeQValueFromValues(state, action)
-            
-            self.values[state] = Q_s[Q_s.argMax()]
-            
-            iterCounter += 1
-            if iterCounter >= self.iterations:
-              return
+            if Terminal:
+                self.values[currentState] = 0
+   
+            else:
+                for action in self.mdp.getPossibleActions(currentState):
+                    tempValue = 0
+                                        
+                    for t in self.mdp.getTransitionStatesAndProbs(currentState, action):
+                        Reward=self.mdp.getReward(currentState, action, t[0])
+                        tempValue += t[1]*(Reward+ self.discount * values[t[0]])
+                    possibleVals.append(tempValue)
 
-
+                self.values[currentState] = max(possibleVals)
 
 class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
     """
         * Please read learningAgents.py before reading this.*
+
         A PrioritizedSweepingValueIterationAgent takes a Markov decision process
         (see mdp.py) on initialization and runs prioritized sweeping value iteration
         for a given number of iterations using the supplied parameters.
@@ -213,64 +210,65 @@ class PrioritizedSweepingValueIterationAgent(AsynchronousValueIterationAgent):
 
     def runValueIteration(self):
         "*** YOUR CODE HERE ***"
+        #values = util.Counter()
+        #predSets =[]
+        #initialize an empty priority queue
+        fringe = util.PriorityQueue()
+        states=self.mdp.getStates()
+        predecessors={}
 
-        mdp = self.mdp
-        values = self.values
-        discount = self.discount
-        iterations = self.iterations
-        theta = self.theta
-        states = mdp.getStates()
+        #For each state s do
+        for tstate in self.mdp.getStates():
+            previous=set()
+            #find predecessors of state
+            #predecessors = set()
+            for state in states:
+                actions=self.mdp.getPossibleActions(state)
+                for action in actions:
+                    transitions=self.mdp.getTransitionStatesAndProbs(state,action)
+                    for next,probability in transitions:
+                        if probability!=0:
+                            if tstate==next:
+                                previous.add(state)
 
-
-        predecessors = {} # dict
+            predecessors[tstate]=previous
         for state in states:
-          predecessors[state] = set()
+            Terminal=self.mdp.isTerminal(state)
+            if Terminal==False:
+                current=self.values[state]
+                qValues=[]
+                actions=self.mdp.getPossibleActions(state)
+                for action in actions:
+                    tempvalue=self.computeQValueFromValues(state,action)
+                    qValues=qValues+[tempvalue]
+                maxQvalue=max(qValues)
+                diff=current-maxQvalue
+                if diff>0:
+                    diff=diff*-1
+                fringe.push(state,diff)
 
-        pq = util.PriorityQueue()
+        for i in range(0,self.iterations):
+            if fringe.isEmpty():
+                break
+            s=fringe.pop()
+            Terminal=self.mdp.isTerminal(s)
 
-        # computes predecessors and puts initial stuff into pq
-        for state in states:
-          Q_s = util.Counter()
+            if not Terminal:
+                values=[]
+                for action in self.mdp.getPossibleActions(s):
+                    value=0
+                    for next,prob in self.mdp.getTransitionStatesAndProbs(s,action):
+                        Reward=self.mdp.getReward(s,action,next)
+                        value=value+(prob*(Reward+(self.discount*self.values[next])))
+                    values.append(value)
+                self.values[s]=max(values)
 
-          for action in mdp.getPossibleActions(state):
-            # assigning predecessors
-            T = mdp.getTransitionStatesAndProbs(state, action)
-            for (nextState, prob) in T:
-              if prob != 0:
-                predecessors[nextState].add(state)
-
-            # computing Q values for determining diff's for the pq
-            Q_s[action] = self.computeQValueFromValues(state, action)
-
-          if not mdp.isTerminal(state): # means: if non terminal state
-            maxQ_s = Q_s[Q_s.argMax()]
-            diff = abs(values[state] - maxQ_s)
-            pq.update(state, -diff)
-
-
-        # now for the actual iterations
-        for i in range(iterations):
-          if pq.isEmpty():
-            return
-
-          state = pq.pop()
-
-          if not mdp.isTerminal(state):
-            Q_s = util.Counter()
-            for action in mdp.getPossibleActions(state):
-              Q_s[action] = self.computeQValueFromValues(state, action)
-
-            values[state] = Q_s[Q_s.argMax()]
-
-          for p in predecessors[state]:
-            Q_p = util.Counter()
-            for action in mdp.getPossibleActions(p):
-              # computing Q values for determining diff's for the pq
-              Q_p[action] = self.computeQValueFromValues(p, action)
-
-            #if not mdp.isTerminal(state): # means: if non terminal state
-            maxQ_p = Q_p[Q_p.argMax()]
-            diff = abs(values[p] - maxQ_p)
-              
-            if diff > theta:
-              pq.update(p, -diff)
+            for previous in predecessors[s]:
+                current=self.values[previous]
+                qValues=[]
+                for action in self.mdp.getPossibleActions(previous):
+                    qValues+=[self.computeQValueFromValues(previous,action)]
+                maxQ=max(qValues)
+                diff=abs((current-maxQ))
+                if (diff>self.theta):
+                    fringe.update(previous,-diff)
